@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Info</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .card h3 {
+            margin: 0 0 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="my-4">Weather Information</h1>
+        <div class="row" id="weather-cards"></div>
+    </div>
+
+    <script>
+        async function getToken() {
+            try {
+                const response = await fetch('/get-jwt-token/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'hppc',  
+                        password: 'Hppc@123'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch token');
+                }
+
+                const data = await response.json();
+                localStorage.setItem('jwtToken', data.token); // Store the token in localStorage
+            } catch (error) {
+                console.error('Error fetching JWT token:', error);
+            }
+        }
+
+        async function fetchWeatherData() {
+            const token = localStorage.getItem('jwtToken'); // Retrieve the token from localStorage
+
+            try {
+                const response = await fetch('/api/weather/', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `JWT ${token}`,  // Add the token to the Authorization header
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch weather data');
+                }
+
+                const data = await response.json();
+                displayWeatherData(data);
+            } catch (error) {
+                console.error('Error fetching weather data:', error);
+            }
+        }
+
+        function displayWeatherData(data) {
+            const weatherCardsContainer = document.getElementById('weather-cards');
+            weatherCardsContainer.innerHTML = '';
+
+            data.forEach(record => {
+                const card = document.createElement('div');
+                card.className = 'col-sm-6 col-md-4 col-lg-3 mb-4';
+
+                card.innerHTML = `
+                    <div class="card h-100">
+                        <img src="${record.url}" class="card-img-top" alt="${record.City}">
+                        <div class="card-body">
+                            <h3 class="card-title">${record.City}</h3>
+                            <p class="card-text">Rain: ${record.Rain}</p>
+                            <p class="card-text">Temperature: ${record.Temperature}</p>
+                            <button class="btn btn-primary add-to-favorites">Add to Favorites</button>
+                            </div>
+                    </div>
+                `;
+
+                weatherCardsContainer.appendChild(card);
+            });
+        }
+
+        // Fetch the token and then fetch weather data
+        getToken().then(() => {
+            fetchWeatherData();
+        });
+
+    </script>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

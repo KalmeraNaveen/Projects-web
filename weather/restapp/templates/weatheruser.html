@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% block style %}
+<style>
+    body {
+        margin: 0px;
+    }
+    .card img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    .card h3 {
+        margin: 0 0 8px 0;
+    }
+    #weather-cards {
+        display: none;
+    }
+    #loading-spinner {
+        text-align: center;
+        margin-top: 50px;
+    }
+</style>
+{% endblock %}
+{% block body %}
+<div class="container">
+    <h1 class="my-4">Weather Information</h1>
+    <div id="loading-spinner">
+        <div class="spinner-border text-success" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+        <p>Loading weather data...</p>
+    </div>
+    <div class="row" id="weather-cards"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        getToken().then(() => {
+            fetchWeatherData();
+        });
+    });
+    
+    // Function to get the JWT token and store it in localStorage
+    async function getToken() {
+        try {
+            const response = await fetch('/get-jwt-token/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: 'hppc',
+                    password: 'Hppc@123'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch token');
+            }
+
+            const data = await response.json();
+            localStorage.setItem('jwtToken', data.token); // Store the token in localStorage
+        } catch (error) {
+            console.error('Error fetching JWT token:', error);
+        }
+    }
+
+    // Function to fetch weather data from your API
+    async function fetchWeatherData(retry = true) {
+        const token = localStorage.getItem('jwtToken'); // Retrieve the token from localStorage
+
+        try {
+            const response = await fetch('/api/weather/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `JWT ${token}`, // Add the token to the Authorization header
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                if (errorData.detail === "Signature has expired." && retry) {
+                    // If the token has expired and we haven't retried yet, get a new token and retry
+                    await getToken();
+                    return fetchWeatherData(false); // Retry once
+                }
+                throw new Error('Failed to fetch weather data');
+            }
+
+            const data = await response.json();
+            displayWeatherData(data);
+        } catch (error) {
+            console.error('Error fetching weather data:', error);
+        }
+    }
+
+    // Function to display weather data on the page
+    function displayWeatherData(data) {
+        const weatherCardsContainer = document.getElementById('weather-cards');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        loadingSpinner.style.display = 'none'; // Hide the loading spinner
+        weatherCardsContainer.style.display = 'flex'; // Show the weather cards container
+
+        weatherCardsContainer.innerHTML = '';
+
+        data.forEach(record => {
+            const card = document.createElement('div');
+            card.className = 'col-sm-6 col-md-4 col-lg-3 mb-4';
+
+            card.innerHTML = `
+                <div class="card h-100">
+                    <img src="${record.url}" class="card-img-top" alt="${record.City}">
+                    <div class="card-body">
+                        <h3 class="card-title">${record.City}</h3>
+                        <p class="card-text">Rain: ${record.Rain}</p>
+                        <p class="card-text">Temperature: ${record.Temperature}</p>
+                        <button class="btn btn-primary add-to-favorites" data-city="${record.City}" >Add to Favorites</button>
+                    </div>
+                </div>
+            `;
+
+            weatherCardsContainer.appendChild(card);
+        });
+
+        // Attach event listener to "Add to Favorites" buttons
+        document.querySelectorAll('.add-to-favorites').forEach(button => {
+            button.addEventListener('click', function() {
+                const City = this.getAttribute('data-city');
+                // console.log(`Add to Favorites button clicked for city: ${City}`);
+                addToFavorites(City);
+            });
+        });
+    }
+
+    // Function to add a city to the user's favorites
+    async function addToFavorites(City) {
+        const Email = localStorage.getItem('userEmail'); // Retrieve the email from localStorage
+
+        if (!Email) {
+            alert('No email found in local storage.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/usersapi/', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: Email,
+                    city: City
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                // console.error('Failed to add city to favorites:', errorData);
+                alert(`Error: ${errorData.detail || 'Failed to add city to favorites or you already added this city'}`);
+                throw new Error('Failed to add city to favorites');
+            }
+
+            const data = await response.json();
+            alert(data.msg); // Notify the user that the city has been added
+        } catch (error) {
+            console.error('Error adding city to favorites:', error);
+        }
+    }
+</script>
+
+<!-- Bootstrap JS and dependencies -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+{% endblock %}

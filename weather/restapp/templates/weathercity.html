@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block style %}
+<style>
+    body {
+        margin: 0;
+    }
+    .card img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    .card h3 {
+        margin: 0 0 8px 0;
+    }
+    .card p {
+        margin: 5px 0;
+        font-size: 14px;
+    }
+    #weather-cards {
+        display: none;
+    }
+    #loading-spinner {
+        text-align: center;
+        margin-top: 50px;
+    }
+    #no-cities-message {
+        text-align: center;
+        margin-top: 50px;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <h1 class="mb-4">Weather Information</h1>
+    <div id="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden"></span>
+        </div>
+        <p>Loading weather data...</p>
+    </div>
+    <div id="no-cities-message" style="display: none;">
+        <h2>No cities added</h2>
+    <p>Please add some cities to view weather information.</p>
+    <p>Your weather dashboard is currently empty. To get started, use the "Search City" option above to add your favorite cities.</p>
+    <p>Once you've added cities, their current weather conditions will be displayed here.</p>
+    </div>
+    <div id="weather-cards" class="row">
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchUserCities()
+            .then(cities => {
+                if (!cities || cities.length === 0) {
+                    showNoCitiesMessage();
+                } else {
+                    return getToken().then(token => fetchWeatherData(token, cities));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNoCitiesMessage(); // In case of any error, show the no cities message.
+            });
+    });
+
+    async function fetchUserCities() {
+        const email = localStorage.getItem('userEmail');
+        if (!email) {
+            throw new Error('No email found in local storage');
+        }
+
+        const response = await fetch(`/usersapi/?email=${encodeURIComponent(email)}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch user cities');
+        }
+        const data = await response.json();
+        return data.City || []; // Return an empty array if City is null or undefined
+    }
+
+    function showNoCitiesMessage() {
+        document.getElementById('loading-spinner').style.display = 'none';
+        document.getElementById('no-cities-message').style.display = 'block';
+    }
+
+    async function getToken() {
+        try {
+            const response = await fetch('/get-jwt-token/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: 'hppc',
+                    password: 'Hppc@123'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch token');
+            }
+
+            const data = await response.json();
+            return data.token; // Return the token instead of storing it
+        } catch (error) {
+            console.error('Error fetching JWT token:', error);
+            throw error;
+        }
+    }
+
+    async function fetchWeatherData(token, cities) {
+        const weatherData = [];
+
+        for (const city of cities) {
+            try {
+                const response = await fetch(`/api/weather/?city=${encodeURIComponent(city)}`, {
+                    headers: {
+                        'Authorization': `JWT ${token}`
+                    }
+                });
+
+                if (response.status === 401) {
+                    const errorData = await response.json();
+                    if (errorData.detail === "Signature has expired.") {
+                        token = await getToken();
+                        return fetchWeatherData(token, cities);
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch weather data for ${city}`);
+                }
+
+                const data = await response.json();
+                if (data.City && data.Temperature && data.Rain) { // Check if valid data is present
+                    weatherData.push(data);
+                }
+            } catch (error) {
+                console.error(`Error fetching weather for ${city}:`, error);
+            }
+        }
+
+        if (weatherData.length > 0) {
+            displayWeatherData(weatherData);
+        } else {
+            showNoCitiesMessage(); // Show message if no valid weather data
+        }
+    }
+
+    function displayWeatherData(weatherData) {
+        const weatherCardsContainer = document.getElementById('weather-cards');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        loadingSpinner.style.display = 'none';
+        weatherCardsContainer.style.display = 'flex';
+
+        weatherCardsContainer.innerHTML = '';
+
+        weatherData.forEach(record => {
+            const card = document.createElement('div');
+            card.className = 'col-sm-6 col-md-4 col-lg-3 mb-4';
+
+            card.innerHTML = `
+                <div class="card h-100">
+                    <img src="${record.url || 'default-image-url.jpg'}" class="card-img-top" alt="${record.City}">
+                    <div class="card-body">
+                        <h3 class="card-title">${record.City}</h3>
+                        <p class="card-text">Rain: ${record.Rain}</p>
+                        <p class="card-text">Temperature: ${record.Temperature}</p>
+                    </div>
+                </div>
+            `;
+
+            weatherCardsContainer.appendChild(card);
+        });
+    }
+</script>
+
+
+<!-- Bootstrap JS and dependencies -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+{% endblock %}
