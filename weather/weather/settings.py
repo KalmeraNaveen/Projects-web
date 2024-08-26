@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-71u7m)*t+hx0+4gw08u6p&5r$c1$o7s3d&6=ys$8j#=(1a=fws
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["simple-weather-h4imnubwv-kalmeranaveens-projects.vercel.app","simple-weatherapp-git-main-kalmeranaveens-projects.vercel.app"]
+ALLOWED_HOSTS = []
 
 
 # Application definition
